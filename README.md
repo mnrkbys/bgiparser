@@ -86,6 +86,10 @@ $ python3 ./bgiparser.py -f ./sample/sample_mymac/backgrounditems.btm -c
 ]
 ```
 
+## TODO
+
+- [ ] Confirm condition of each entry (enable or disable)
+
 ## Author
 
 [Minoru Kobayashi](https://twitter.com/unkn0wnbit)
