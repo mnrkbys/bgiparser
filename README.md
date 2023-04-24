@@ -2,6 +2,9 @@
 
 The entries of "Login Items" are stored in "~/Library/Application Support/com.apple.backgroundtaskmanagementagent/backgrounditems.btm" since macOS 10.13 High Sierra. This tool can parse it and output pairs of entry name and application path as JSON data.
 
+Apple has changed the location of the file that records Login Items in macOS 13 Ventura.
+You can download a parsing tool for it from [here](https://github.com/objective-see/DumpBTM) or just run `sfltool dumpbtm` on macOS 13.
+
 ## Requirement
 
 - Python 3.5 or later
