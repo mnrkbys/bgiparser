@@ -35,7 +35,6 @@ optional arguments:
 ```bash
 $ git clone https://github.com/mnrkbys/bgiparser.git
 $ pip install nska_deserialize
-$ cd bgiparser
 ```
 
 ## Execution example 1
