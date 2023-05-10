@@ -3,7 +3,7 @@
 # bgiparser.py
 # Parses backgrounditems.btm file to get items that runs when an user logs in.
 #
-# Copyright 2020 Minoru Kobayashi <unknownbit@gmail.com> (@unkn0wnbit)
+# Copyright 2020-2023 Minoru Kobayashi <unknownbit@gmail.com> (@unkn0wnbit)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,16 +18,13 @@
 # limitations under the License.
 #
 
-import os
-import sys
 import argparse
 import json
+import os
 import struct
+import sys
 
-try:
-    import ccl_bplist
-except ImportError:
-    sys.exit('Import Error: ccl_bplist is not installed.\nGet it from https://github.com/cclgroupltd/ccl-bplist')
+import nska_deserialize as nd
 
 # global variables
 debug_mode = False
@@ -56,12 +53,12 @@ def dbg_print(msg):
         print(msg)
 
 
-def get_login_items_entries(btm_file):
-    with open(btm_file, 'rb') as fp:
-        plist = ccl_bplist.load(fp)
-        ns_keyed_archiver_obj = ccl_bplist.deserialise_NsKeyedArchiver(plist, parse_whole_structure=True)
-        ccl_bplist.set_object_converter(ccl_bplist.NSKeyedArchiver_common_objects_convertor)
-        return ns_keyed_archiver_obj['root']['backgroundItems']['allContainers']
+# def get_login_items_entries(btm_file):
+#     with open(btm_file, 'rb') as fp:
+#         plist = ccl_bplist.load(fp)
+#         ns_keyed_archiver_obj = ccl_bplist.deserialise_NsKeyedArchiver(plist, parse_whole_structure=True)
+#         ccl_bplist.set_object_converter(ccl_bplist.NSKeyedArchiver_common_objects_convertor)
+#         return ns_keyed_archiver_obj['root']['backgroundItems']['allContainers']
 
 
 def parse_bookmark_data(data):
@@ -153,6 +150,59 @@ def parse_bookmark_data(data):
                 return False
 
 
+def parse_btm(btm_path: str) -> list | dict:
+    with open(btm_path, 'rb') as f:
+        plist = nd.deserialize_plist(f)
+        dbg_print("Opened {}".format(btm_path))
+
+    # >= macOS 10.13 and <= macOS 12
+    if isinstance(plist, dict) and plist['version'] == 2:
+        dbg_print("Detected version: {}".format(plist['version']))
+        entries = list()
+        login_item_entries = plist.get('backgroundItems', {}).get('allContainers', {})
+        for item_num in list(range(len(login_item_entries))):
+            bm_data = login_item_entries[item_num]['internalItems'][0]['bookmark']['data']
+            login_item = dict()
+            if isinstance(bm_data, bytes):
+                login_item = parse_bookmark_data(bm_data)
+            elif isinstance(bm_data, dict):
+                login_item = parse_bookmark_data(bm_data['NS.data'])
+
+            if login_item:
+                entries.append(login_item)
+
+    # >= macOS 13
+    elif isinstance(plist, list) and plist[0].get('version', 0) >= 3:
+        dbg_print("Detected version: {}".format(plist[0]['version']))
+        # login_item = dict()
+        entries = dict()
+        for uuid in plist[1]['store']['itemsByUserIdentifier'].keys():
+            dbg_print("=" * 50)
+            dbg_print("User UUID: {}".format(uuid))
+            dbg_print("=" * 50)
+            login_item = dict({uuid: list(dict())})
+            for item_number in list(range(len(plist[1]['store']['itemsByUserIdentifier'][uuid]))):
+                dbg_print("-" * 20 + " Item: {} ".format(item_number) + "-" * 20)
+                item = dict()
+                for k, v in plist[1]['store']['itemsByUserIdentifier'][uuid][item_number].items():
+                    if k not in ('lightweightRequirement', 'bookmark'):  # These keys contain bytes data.
+                        if k in ('type', ):
+                            dbg_print("{}: 0x{:X}".format(k, v))
+                        else:
+                            dbg_print("{}: {}".format(k, v))
+                        item.update({k: v})
+
+                login_item[uuid].append(item)
+
+            if login_item[uuid]:
+                entries.update(login_item)
+
+    else:
+        exit('Unsupported btm file: {}'.format(btm_path))
+
+    return entries
+
+
 # main
 def main():
     global debug_mode
@@ -170,16 +220,7 @@ def main():
         if os.path.exists(out_file) and not args.force:
             sys.exit('output file already exists: {}'.format(out_file))
 
-    login_items_entries = get_login_items_entries(btm_file)
-
-    for item_num in list(range(len(login_items_entries))):
-        if type(login_items_entries[item_num]['internalItems'][0]['bookmark']['data']) == bytes:
-            login_item = parse_bookmark_data(login_items_entries[item_num]['internalItems'][0]['bookmark']['data'])
-        elif type(login_items_entries[item_num]['internalItems'][0]['bookmark']['data']) == ccl_bplist.NsKeyedArchiverDictionary:
-            login_item = parse_bookmark_data(login_items_entries[item_num]['internalItems'][0]['bookmark']['data']['NS.data'])
-
-        if login_item:
-            login_items.append(login_item)
+    login_items = parse_btm(btm_file)
 
     if args.console or debug_mode:
         print(json.dumps(login_items, ensure_ascii=False, indent=4))
