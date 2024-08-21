@@ -27,6 +27,7 @@ import sys
 import nska_deserialize as nd
 
 # global variables
+VERSION = '20240821'
 debug_mode = False
 
 
@@ -43,6 +44,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument('--force', action='store_true', default=False,
                         help='Enable to overwrite existing data.')
     parser.add_argument('--debug', action='store_true', default=False, help='Enable debug mode.')
+    parser.add_argument('-v', '--version', action='version', version=f"%(prog)s {VERSION}", help='Show version.')
     return parser.parse_args()
 
 
